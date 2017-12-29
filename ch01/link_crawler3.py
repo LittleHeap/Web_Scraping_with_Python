@@ -1,20 +1,23 @@
+# -*- coding: utf-8 -*-
+'''
+    链接爬虫
+'''
+import queue
 import re
-import urlparse
-import urllib2
 import time
+import urllib.parse
+import urllib.request
+import urllib.robotparser
 from datetime import datetime
-import robotparser
-import Queue
 
 
-def link_crawler(seed_url, link_regex=None, delay=5, max_depth=-1, max_urls=-1, headers=None, user_agent='wswp', proxy=None, num_retries=1):
-    """Crawl from the given seed URL following links matched by link_regex
-    """
-    # the queue of URL's that still need to be crawled
-    crawl_queue = Queue.deque([seed_url])
-    # the URL's that have been seen and at what depth
+def link_crawler(seed_url, link_regex=None, delay=5, max_depth=-1, max_urls=-1, headers=None, user_agent='wswp',
+                 proxy=None, num_retries=1):
+    # 爬虫队列
+    crawl_queue = queue.deque([seed_url])
+    # 已爬网页和其对应的深度
     seen = {seed_url: 0}
-    # track how many URL's have been downloaded
+    # 计算爬取网页的数量
     num_urls = 0
     rp = get_robots(seed_url)
     throttle = Throttle(delay)
@@ -35,7 +38,10 @@ def link_crawler(seed_url, link_regex=None, delay=5, max_depth=-1, max_urls=-1, 
                 # can still crawl further
                 if link_regex:
                     # filter for links matching our regular expression
-                    links.extend(link for link in get_links(html) if re.match(link_regex, link))
+                    html = html.decode('utf-8')
+                    for link in get_links(html):
+                        if re.match(link_regex, link):
+                            links.extend(link)
 
                 for link in links:
                     link = normalize(seed_url, link)
@@ -52,20 +58,19 @@ def link_crawler(seed_url, link_regex=None, delay=5, max_depth=-1, max_urls=-1, 
             if num_urls == max_urls:
                 break
         else:
-            print 'Blocked by robots.txt:', url
+            print('Blocked by robots.txt:', url)
 
 
+# 下载限速
 class Throttle:
-    """Throttle downloading by sleeping between requests to same domain
-    """
     def __init__(self, delay):
         # amount of delay between downloads for each domain
         self.delay = delay
         # timestamp of when a domain was last accessed
         self.domains = {}
-        
+
     def wait(self, url):
-        domain = urlparse.urlparse(url).netloc
+        domain = urllib.parse.urlparse(url).netloc
         last_accessed = self.domains.get(domain)
 
         if self.delay > 0 and last_accessed is not None:
@@ -76,24 +81,24 @@ class Throttle:
 
 
 def download(url, headers, proxy, num_retries, data=None):
-    print 'Downloading:', url
-    request = urllib2.Request(url, data, headers)
-    opener = urllib2.build_opener()
+    print('Downloading:', url)
+    request = urllib.request.Request(url, data, headers)
+    opener = urllib.request.build_opener()
     if proxy:
-        proxy_params = {urlparse.urlparse(url).scheme: proxy}
-        opener.add_handler(urllib2.ProxyHandler(proxy_params))
+        proxy_params = {urllib.urlparse.urlparse(url).scheme: proxy}
+        opener.add_handler(urllib.request.ProxyHandler(proxy_params))
     try:
         response = opener.open(request)
         html = response.read()
         code = response.code
-    except urllib2.URLError as e:
-        print 'Download error:', e.reason
+    except urllib.request.URLError as e:
+        print('Download error:', e.reason)
         html = ''
         if hasattr(e, 'code'):
             code = e.code
             if num_retries > 0 and 500 <= code < 600:
                 # retry 5XX HTTP errors
-                return download(url, headers, proxy, num_retries-1, data)
+                return download(url, headers, proxy, num_retries - 1, data)
         else:
             code = None
     return html
@@ -102,34 +107,33 @@ def download(url, headers, proxy, num_retries, data=None):
 def normalize(seed_url, link):
     """Normalize this URL by removing hash and adding domain
     """
-    link, _ = urlparse.urldefrag(link) # remove hash to avoid duplicates
-    return urlparse.urljoin(seed_url, link)
+    link, _ = urllib.parse.urldefrag(link)  # remove hash to avoid duplicates
+    return urllib.parse.urljoin(seed_url, link)
 
 
 def same_domain(url1, url2):
     """Return True if both URL's belong to same domain
     """
-    return urlparse.urlparse(url1).netloc == urlparse.urlparse(url2).netloc
+    return urllib.parse.urlparse(url1).netloc == urllib.parse.urlparse(url2).netloc
 
 
 def get_robots(url):
     """Initialize robots parser for this domain
     """
-    rp = robotparser.RobotFileParser()
-    rp.set_url(urlparse.urljoin(url, '/robots.txt'))
+    rp = urllib.robotparser.RobotFileParser()
+    rp.set_url(urllib.parse.urljoin(url, '/robots.txt'))
     rp.read()
     return rp
-        
 
+
+# 返回网页的全部链接
 def get_links(html):
-    """Return a list of links from html 
-    """
-    # a regular expression to extract all links from the webpage
     webpage_regex = re.compile('<a[^>]+href=["\'](.*?)["\']', re.IGNORECASE)
-    # list of all links from the webpage
     return webpage_regex.findall(html)
 
 
 if __name__ == '__main__':
-    link_crawler('http://example.webscraping.com', '/(index|view)', delay=0, num_retries=1, user_agent='BadCrawler')
-    link_crawler('http://example.webscraping.com', '/(index|view)', delay=0, num_retries=1, max_depth=1, user_agent='GoodCrawler')
+    link_crawler('http://example.webscraping.com', '/(places/default/index|places/default/view)', delay=0, max_depth=2,
+                 num_retries=1, user_agent='BadCrawler')
+    link_crawler('http://example.webscraping.com', '/(places/default/index|places/default/view)', delay=0,
+                 num_retries=1, max_depth=2, user_agent='GoodCrawler')

@@ -1,26 +1,29 @@
 # -*- coding: utf-8 -*-
-
+'''
+    设置访问失败限度，完善ID遍历爬虫强壮性
+'''
 
 import itertools
-from common import download
+
+from common import download5
 
 
 def iteration():
-    max_errors = 5 # maximum number of consecutive download errors allowed
-    num_errors = 0 # current number of consecutive download errors
+    # 允许最大访问失败次数
+    max_errors = 5
+    # 当前已有访问失败次数
+    num_errors = 0
     for page in itertools.count(1):
-        url = 'http://example.webscraping.com/view/-{}'.format(page)
-        html = download(url)
+        url = 'http://example.webscraping.com/places/default/view/%d' % page
+        html = download5(url)
         if html is None:
-            # received an error trying to download this webpage
+            # 返回下载网页失败
             num_errors += 1
             if num_errors == max_errors:
-                # reached maximum amount of errors in a row so exit
+                # 达到预期失败限度，退出循环
                 break
-            # so assume have reached the last country ID and can stop downloading
         else:
-            # success - can scrape the result
-            # ...
+            # 否则重置当前失败次数
             num_errors = 0
 
 

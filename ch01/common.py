@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-
+'''
+    通常模式下的5种网页下载函数
+'''
 import urllib.request
 import urllib.parse
 
@@ -17,6 +19,7 @@ def download2(url):
     try:
         html = urllib.request.urlopen(url).read()
     except urllib.request.URLError as e:
+        # 打印异常原因
         print('Download error:', e.reason)
         html = None
     return html
@@ -31,18 +34,22 @@ def download3(url, num_retries=2):
     except urllib.request.URLError as e:
         print('Download error:', e.reason)
         html = None
+        # 重复请求
         if num_retries > 0:
+            # 判定异常参数是否介于500-599
             if hasattr(e, 'code') and 500 <= e.code < 600:
                 # retry 5XX HTTP errors
                 html = download3(url, num_retries - 1)
     return html
 
 
-# 添加用户代理
+# 添加用户代理user_agent
 def download4(url, user_agent='wswp', num_retries=2):
     """Download function that includes user agent support"""
     print('Downloading:', url)
+    # 设置用户代理名称
     headers = {'User-agent': user_agent}
+    # 请求同时添加用户代理
     request = urllib.request.Request(url, headers=headers)
     try:
         html = urllib.request.urlopen(request).read()
@@ -51,14 +58,12 @@ def download4(url, user_agent='wswp', num_retries=2):
         html = None
         if num_retries > 0:
             if hasattr(e, 'code') and 500 <= e.code < 600:
-                # retry 5XX HTTP errors
                 html = download4(url, user_agent, num_retries - 1)
     return html
 
 
-# 支持代理
+# 设置支持代理
 def download5(url, user_agent='wswp', proxy=None, num_retries=2):
-    """Download function with support for proxies"""
     print('Downloading:', url)
     headers = {'User-agent': user_agent}
     request = urllib.request.Request(url, headers=headers)
@@ -73,7 +78,6 @@ def download5(url, user_agent='wswp', proxy=None, num_retries=2):
         html = None
         if num_retries > 0:
             if hasattr(e, 'code') and 500 <= e.code < 600:
-                # retry 5XX HTTP errors
                 html = download5(url, user_agent, proxy, num_retries - 1)
     return html
 
