@@ -4,8 +4,9 @@ except ImportError:
     import pickle
 import zlib
 from datetime import datetime, timedelta
-from pymongo import MongoClient
+
 from bson.binary import Binary
+from pymongo import MongoClient
 
 
 class MongoCache:
@@ -28,6 +29,7 @@ class MongoCache:
      ...
     KeyError: 'http://example.webscraping.com does not exist'
     """
+
     def __init__(self, client=None, expires=timedelta(days=30)):
         """
         client: mongo database client
@@ -36,7 +38,7 @@ class MongoCache:
         # if a client object is not passed 
         # then try connecting to mongodb at the default localhost port 
         self.client = MongoClient('localhost', 27017) if client is None else client
-        #create collection to store cached webpages,
+        # create collection to store cached webpages,
         # which is the equivalent of a table in a relational database
         self.db = self.client.cache
         self.db.webpage.create_index('timestamp', expireAfterSeconds=expires.total_seconds())
@@ -48,25 +50,23 @@ class MongoCache:
             return False
         else:
             return True
-    
+
     def __getitem__(self, url):
         """Load value at this URL
         """
         record = self.db.webpage.find_one({'_id': url})
         if record:
-            #return record['result']
+            # return record['result']
             return pickle.loads(zlib.decompress(record['result']))
         else:
             raise KeyError(url + ' does not exist')
 
-
     def __setitem__(self, url, result):
         """Save value for this URL
         """
-        #record = {'result': result, 'timestamp': datetime.utcnow()}
+        # record = {'result': result, 'timestamp': datetime.utcnow()}
         record = {'result': Binary(zlib.compress(pickle.dumps(result))), 'timestamp': datetime.utcnow()}
         self.db.webpage.update({'_id': url}, {'$set': record}, upsert=True)
-
 
     def clear(self):
         self.db.webpage.drop()

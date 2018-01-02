@@ -1,62 +1,69 @@
+# -*- coding: utf-8 -*-
 import re
 import urllib.parse
-import time
-import datetime
 import urllib.robotparser
+
 from downloader import Downloader
 
 
-def link_crawler(seed_url, link_regex=None, delay=5, max_depth=-1, max_urls=-1, user_agent='wswp', proxies=None, num_retries=1, scrape_callback=None, cache=None):
+def link_crawler(seed_url, link_regex=None, delay=2, max_depth=1, max_urls=-1, user_agent='wswp', proxies=None,
+                 num_retries=1, scrape_callback=None, cache=None):
     """Crawl from the given seed URL following links matched by link_regex
     """
-    # the queue of URL's that still need to be crawled
+    # 目标爬虫URL队列
     crawl_queue = [seed_url]
-    # the URL's that have been seen and at what depth
+    # 初始化已经遍历爬虫的URL深度字典
     seen = {seed_url: 0}
-    # track how many URL's have been downloaded
+    # 记录爬了多少URL地址
     num_urls = 0
     rp = get_robots(seed_url)
+    # 下载页面
     D = Downloader(delay=delay, user_agent=user_agent, proxies=proxies, num_retries=num_retries, cache=cache)
-
     while crawl_queue:
         url = crawl_queue.pop()
         depth = seen[url]
-        # check url passes robots.txt restrictions
+        # 检查robots.txt限定，是否允许代理爬虫当前页面
         if rp.can_fetch(user_agent, url):
+            # 触发__call__函数
             html = D(url)
             links = []
             if scrape_callback:
                 links.extend(scrape_callback(url, html) or [])
 
             if depth != max_depth:
-                # can still crawl further
+                # 继续深度爬虫
                 if link_regex:
-                    # filter for links matching our regular expression
-                    links.extend(link for link in get_links(html) if re.match(link_regex, link))
-
+                    # 正则表达式限定
+                    # links.extend(link for link in get_links(html) if re.match(link_regex, link))
+                    # Python 3.X解码
+                    html = html.decode('utf-8')
+                    # 遍历当前页面所有链接
+                    for link in get_links(html):
+                        if re.match(link_regex, link):
+                            print(link)
+                            links.extend([link])
                 for link in links:
                     link = normalize(seed_url, link)
-                    # check whether already crawled this link
+                    # 检查是否爬过当前URL
                     if link not in seen:
                         seen[link] = depth + 1
-                        # check link is within same domain
+                        # 检查URL是否与种子地址属于同一源
                         if same_domain(seed_url, link):
-                            # success! add this new link to queue
+                            # 确认成功，加入未来爬虫URL队列
                             crawl_queue.append(link)
 
-            # check whether have reached downloaded maximum
+            # 检查已爬数量是否达到最大值
             num_urls += 1
-            if num_urls == max_urls:
-                break
+            # if num_urls == max_urls:
+            #     break
         else:
             print('Blocked by robots.txt:', url)
-
 
 
 def normalize(seed_url, link):
     """Normalize this URL by removing hash and adding domain
     """
-    link, _ = urllib.parse.urldefrag(link) # remove hash to avoid duplicates
+    link, _ = urllib.parse.urldefrag(link)  # remove hash to avoid duplicates
     return urllib.parse.urljoin(seed_url, link)
 
 
@@ -73,7 +80,7 @@ def get_robots(url):
     rp.set_url(urllib.parse.urljoin(url, '/robots.txt'))
     rp.read()
     return rp
-        
+
 
 def get_links(html):
     """Return a list of links from html 
@@ -85,5 +92,7 @@ def get_links(html):
 
 
 if __name__ == '__main__':
-    link_crawler('http://example.webscraping.com', '/(index|view)', delay=0, num_retries=1, user_agent='BadCrawler')
-    link_crawler('http://example.webscraping.com', '/(index|view)', delay=0, num_retries=1, max_depth=1, user_agent='GoodCrawler')
+    link_crawler('http://example.webscraping.com', '/(places/default/index|places/default/view)', delay=3,
+                 num_retries=1, user_agent='BadCrawler')
+    link_crawler('http://example.webscraping.com', '/(places/default/index|places/default/view)', delay=3,
+                 num_retries=1, max_depth=1, user_agent='GoodCrawler')

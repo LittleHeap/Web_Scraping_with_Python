@@ -22,26 +22,30 @@ class Downloader:
         self.opener = opener
         self.cache = cache
 
+    # 下载前检查缓存
     def __call__(self, url):
         result = None
         if self.cache:
             try:
                 result = self.cache[url]
             except KeyError:
-                # url is not available in cache 
+                # URL不在cache中存储
                 pass
             else:
                 if self.num_retries > 0 and 500 <= result['code'] < 600:
-                    # server error so ignore result from cache and re-download
+                    # 服务器错误重新下载
                     result = None
         if result is None:
-            # result was not loaded from cache so still need to download
+            # 不存在获取的URL结果所以重新下载
+            # 延时等待
             self.throttle.wait(url)
             proxy = random.choice(self.proxies) if self.proxies else None
             headers = {'User-agent': self.user_agent}
+            # 获取下载结果
             result = self.download(url, headers, proxy=proxy, num_retries=self.num_retries)
+            # 存在cache存储情况下
             if self.cache:
-                # save result to cache
+                # 将cache字典中URL项赋值result，缓存
                 self.cache[url] = result
         return result['html']
 
@@ -62,13 +66,14 @@ class Downloader:
             if hasattr(e, 'code'):
                 code = e.code
                 if num_retries > 0 and 500 <= code < 600:
-                    # retry 5XX HTTP errors
                     return self._get(url, headers, proxy, num_retries - 1, data)
             else:
                 code = None
+        # 返回HTTP状态码
         return {'html': html, 'code': code}
 
 
+# 安全延时
 class Throttle:
     """Throttle downloading by sleeping between requests to same domain
     """
